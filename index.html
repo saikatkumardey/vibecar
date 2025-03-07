@@ -251,6 +251,7 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/objects/Sky.js"></script>
     <script>
         // Helper: Create BufferGeometry from an array of THREE.Vector3 vertices and an array of face index arrays.
         function createBufferGeometry(vertices, faces) {
@@ -316,8 +317,9 @@
 
         // Sky and environment variables
         let clouds = [];
-        let skyTime = 0;
-        let skySpeed = 0.3;
+        // skyTime and skySpeed no longer needed for the Sky object
+        // let skyTime = 0;
+        // let skySpeed = 0.3;
         let environmentalElements = {
             trees: [
                 { type: 'pine', freq: 0.4 },
@@ -337,7 +339,7 @@
         };
 
         // FPS calculation variables
-        const fpsBufferSize = 100; // Average over the last 60 frames
+        const fpsBufferSize = 60; // Average over the last 60 frames
         let fpsBuffer = [];
         let lastFrameTime = performance.now();
 
@@ -352,7 +354,7 @@
                 document.getElementById('health-container').style.display = 'block';
                 document.getElementById('coins-container').style.display = 'block';
                 startGame();
-            }, 1000);
+            }, 300);
         });
 
         // Initialize the game
@@ -364,7 +366,7 @@
             carHealth = 100;
             updateHealthBar();
             init();
-            initAudio();
+            // initAudio();
 
             // Force an initial render to show the world immediately
             updateChunks();
@@ -634,11 +636,9 @@
         function init() {
             // Set up scene
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB); // Sky blue
-            scene.fog = new THREE.FogExp2(0x87CEEB, 0.002);
-
-            // Create animated sky
-            createSky();
+            // Use a color that matches with the Sky
+            scene.background = new THREE.Color(0x8FBCD4); // Sky blue that matches the Sky object
+            scene.fog = new THREE.FogExp2(0x8FBCD4, 0.002);
 
             // Set up camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.5, 1000);
@@ -663,6 +663,9 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.logarithmicDepthBuffer = true;
             document.body.appendChild(renderer.domElement);
+
+            // Create animated sky - moved after renderer initialization
+            createSky();
 
             // Add lights
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -706,57 +709,71 @@
 
         // Create animated sky with clouds
         function createSky() {
-            // Create sky dome
-            const skyGeometry = new THREE.SphereGeometry(900, 32, 32);
-            // We'll flip the geometry inside out
-            skyGeometry.scale(-1, 1, 1);
-
-            // Create gradient sky material using a shader
-            const skyMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    topColor: { value: new THREE.Color(0x0077ff) }, // Deep blue
-                    bottomColor: { value: new THREE.Color(0xffffff) }, // White/Light blue
-                    offset: { value: 400 },
-                    exponent: { value: 0.6 },
-                    time: { value: 0 }
-                },
-                vertexShader: `
-                    varying vec3 vWorldPosition;
-                    void main() {
-                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                        vWorldPosition = worldPosition.xyz;
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                    }
-                `,
-                fragmentShader: `
-                    uniform vec3 topColor;
-                    uniform vec3 bottomColor;
-                    uniform float offset;
-                    uniform float exponent;
-                    uniform float time;
-                    varying vec3 vWorldPosition;
-                    void main() {
-                        float h = normalize(vWorldPosition + offset).y;
-                        float fadeFactor = max(0.0, 20.0 - time * 5.0);
-                        vec3 dayColor = mix(bottomColor, topColor, max(0.0, pow(max(0.0, h), exponent)));
-                        gl_FragColor = vec4(dayColor, 1.0);
-                    }
-                `,
-                side: THREE.BackSide
-            });
-
-            const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+            // Create Sky object from Three.js
+            const sky = new THREE.Sky();
+            sky.scale.setScalar(450000);
             scene.add(sky);
 
-            // Create clouds
-            const cloudCount = 20;
-            for (let i = 0; i < cloudCount; i++) {
-                createCloud(
-                    Math.random() * 1000 - 500,
-                    100 + Math.random() * 50,
-                    Math.random() * 1000 - 500,
-                    5 + Math.random() * 20 // Size
-                );
+            // Add Sun
+            const sunPosition = new THREE.Vector3();
+
+            // Add effective sun and control parameters
+            const effectController = {
+                turbidity: 0,
+                rayleigh: 3,
+                mieCoefficient: 0.005,
+                mieDirectionalG: 0.152,
+                elevation: 10,
+                azimuth: 180,
+                exposure: 0.5 // Fixed value instead of renderer.toneMappingExposure
+            };
+
+            // Apply initial control parameters to the sky
+            const uniforms = sky.material.uniforms;
+            uniforms.turbidity.value = effectController.turbidity;
+            uniforms.rayleigh.value = effectController.rayleigh;
+            uniforms.mieCoefficient.value = effectController.mieCoefficient;
+            uniforms.mieDirectionalG.value = effectController.mieDirectionalG;
+
+            // Calculate sun position
+            const phi = THREE.MathUtils.degToRad(90 - effectController.elevation);
+            const theta = THREE.MathUtils.degToRad(effectController.azimuth);
+            sunPosition.setFromSphericalCoords(1, phi, theta);
+            uniforms.sunPosition.value.copy(sunPosition);
+
+            // Set the exposure value
+            if (renderer.toneMappingExposure !== undefined) {
+                renderer.toneMappingExposure = effectController.exposure;
+            }
+
+            // Create a directional light to represent the sun
+            const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+            sunLight.position.copy(sunPosition);
+            sunLight.position.multiplyScalar(450000);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.near = 0.5;
+            sunLight.shadow.camera.far = 500;
+            sunLight.shadow.camera.left = -100;
+            sunLight.shadow.camera.right = 100;
+            sunLight.shadow.camera.top = 100;
+            sunLight.shadow.camera.bottom = -100;
+            scene.add(sunLight);
+
+            // Add clouds if needed
+            // createClouds();
+        }
+
+        // Create clouds for the sky
+        function createClouds() {
+            // Create a few clouds at random positions
+            for (let i = 0; i < 20; i++) {
+                const x = Math.random() * 1800 - 900;
+                const y = 200 + Math.random() * 50;
+                const z = Math.random() * 1800 - 900;
+                const size = 15 + Math.random() * 15;
+                createCloud(x, y, z, size);
             }
         }
 
@@ -808,16 +825,6 @@
                 }
             });
 
-            // Update sky shader time
-            skyTime += deltaTime * skySpeed;
-
-            // Find the sky dome and update its material time uniform if it exists
-            scene.traverse(object => {
-                if (object.isMesh && object.material && object.material.type === 'ShaderMaterial' &&
-                    object.material.uniforms && object.material.uniforms.time) {
-                    object.material.uniforms.time.value = skyTime;
-                }
-            });
         }
 
         // Handle window resize
@@ -1325,6 +1332,9 @@
 
         // Add trees, rocks, and other environmental elements to a chunk
         function addEnvironmentalElements(chunkGroup, chunkWorldX, chunkWorldZ) {
+            // Create texture loader
+            const textureLoader = new THREE.TextureLoader();
+
             // Seed-based pseudo-random generator for consistent terrain
             const seed = Math.abs(chunkWorldX + chunkWorldZ * 10000);
             const randomFromSeed = (n) => {
@@ -1371,8 +1381,9 @@
                     treeType = randomFromSeed(seed + i * 3) < 0.6 ? 'pine' : 'oak';
                 }
 
-                // Create the tree based on type
-                const treeObj = createTree(treeType, x, z, randomFromSeed(seed + i * 4) * 0.5 + 0.8);
+                // Create the tree based on type with much larger scale (3-5x larger)
+                const baseScale = 3 + randomFromSeed(seed + i * 4) * 5; // This will give trees 3-5x their original size
+                const treeObj = createTree(treeType, x, z, baseScale);
                 treeObj.position.set(x, 0, z);
                 treeObj.castShadow = true;
                 treeObj.userData = {
@@ -1391,16 +1402,31 @@
 
             // Add rocks
             const numRocks = 2;
+            // Load rock texture once and reuse
+            const rockTexture = textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/brick_diffuse.jpg');
+
+            // Configure rock texture for better performance
+            rockTexture.wrapS = THREE.RepeatWrapping;
+            rockTexture.wrapT = THREE.RepeatWrapping;
+            rockTexture.repeat.set(1, 1);
+            rockTexture.minFilter = THREE.LinearFilter;
+            rockTexture.magFilter = THREE.LinearFilter;
+
+            // Create rock material once and reuse
+            const rockMat = new THREE.MeshPhongMaterial({
+                map: rockTexture,
+                shininess: 1
+            });
+
             for (let i = 0; i < numRocks; i++) {
                 const x = (randomFromSeed(seed + i * 4 + 100) * CHUNK_SIZE - CHUNK_SIZE / 2) + chunkWorldX;
                 const z = (randomFromSeed(seed + i * 4 + 101) * CHUNK_SIZE - CHUNK_SIZE / 2) + chunkWorldZ;
 
                 // Don't place rocks on the road
-                if (Math.abs(x - chunkWorldX) < ROAD_WIDTH / 2 + 10) continue;
+                if (Math.abs(x - chunkWorldX) < ROAD_WIDTH / 2 + 50) continue;
 
                 const rockSize = randomFromSeed(seed + i) * 2.5 + 10;
-                const rockGeo = new THREE.DodecahedronGeometry(rockSize);
-                const rockMat = new THREE.MeshPhongMaterial({ color: 0x888888 });
+                const rockGeo = new THREE.DodecahedronGeometry(rockSize, 1); // Reduced geometry complexity
                 const rock = new THREE.Mesh(rockGeo, rockMat);
                 rock.position.set(x, rockSize / 2, z);
                 rock.rotation.set(
@@ -1745,10 +1771,40 @@
             return destroyedGroup;
         }
 
+        // Create a tighter collision box for an object
+        function createTightCollisionBox(object) {
+            const box = new THREE.Box3();
+            box.setFromObject(object);
+
+            // Get the dimensions
+            const size = new THREE.Vector3();
+            box.getSize(size);
+
+            // For the car, make the collision box tighter
+            if (object === car) {
+                // Reduce width by 20%
+                size.x *= 0.8;
+                // Reduce height by 30%
+                size.y *= 0.7;
+                // Reduce depth by 10%
+                size.z *= 0.9;
+
+                // Create a new box with adjusted dimensions
+                const center = new THREE.Vector3();
+                box.getCenter(center);
+                box.set(
+                    new THREE.Vector3(center.x - size.x / 2, center.y - size.y / 2, center.z - size.z / 2),
+                    new THREE.Vector3(center.x + size.x / 2, center.y + size.y / 2, center.z + size.z / 2)
+                );
+            }
+
+            return box;
+        }
+
         // Check collisions and handle them
         function checkCollisions() {
-            // Update car collision box
-            carCollisionBox.setFromObject(car);
+            // Update car collision box with tighter bounds
+            carCollisionBox = createTightCollisionBox(car);
 
             const currentTime = performance.now();
 
@@ -1759,53 +1815,70 @@
                 // Skip already destroyed objects
                 if (object.userData.destroyed) continue;
 
-                // Update object collision box
-                objectCollisionBox.setFromObject(object);
+                // Get distance to object first (quick check)
+                const distance = car.position.distanceTo(object.position);
+
+                // Only do detailed collision check if object is close enough
+                if (distance > 20) continue;  // Skip if too far
+
+                // Update object collision box with tighter bounds
+                objectCollisionBox = createTightCollisionBox(object);
 
                 // Check for collision
                 if (carCollisionBox.intersectsBox(objectCollisionBox)) {
+                    // Calculate collision normal (direction of impact)
+                    const carCenter = new THREE.Vector3();
+                    const objectCenter = new THREE.Vector3();
+                    carCollisionBox.getCenter(carCenter);
+                    objectCollisionBox.getCenter(objectCenter);
+
+                    const collisionNormal = new THREE.Vector3()
+                        .subVectors(carCenter, objectCenter)
+                        .normalize();
+
                     // Only process collisions after cooldown
                     if (currentTime - lastCollisionTime > damageCooldown) {
-                        // Calculate impact force based on speed
-                        const impactForce = Math.abs(carSpeed);
+                        // Calculate impact force based on speed and angle of collision
+                        const impactAngle = Math.abs(Math.cos(
+                            collisionNormal.angleTo(new THREE.Vector3(Math.sin(carRotation), 0, Math.cos(carRotation)))
+                        ));
+                        const impactForce = Math.abs(carSpeed) * impactAngle;
 
-                        // Damage the car
-                        damageCarFromCollision(impactForce);
-                        lastCollisionTime = currentTime;
+                        // Only register collision if impact force is significant
+                        if (impactForce > 5) {
+                            // Damage the car
+                            damageCarFromCollision(impactForce);
+                            lastCollisionTime = currentTime;
 
-                        // If object is destructible, destroy it based on impact force
-                        if (object.userData.destructible && impactForce > 20) {
-                            // Mark object as destroyed
-                            object.userData.destroyed = true;
+                            // If object is destructible, destroy it based on impact force
+                            if (object.userData.destructible && impactForce > 20) {
+                                // Mark object as destroyed
+                                object.userData.destroyed = true;
 
-                            // Create destroyed version
-                            const destroyedObject = createDestroyedTree(object, impactForce);
-                            scene.add(destroyedObject);
-                            damagedTrees.push(destroyedObject);
+                                // Create destroyed version
+                                const destroyedObject = createDestroyedTree(object, impactForce);
+                                scene.add(destroyedObject);
+                                damagedTrees.push(destroyedObject);
 
-                            // Remember the original object's parent to remove it
-                            const parent = object.parent;
-                            if (parent) {
-                                parent.remove(object);
+                                // Remember the original object's parent to remove it
+                                const parent = object.parent;
+                                if (parent) {
+                                    parent.remove(object);
+                                }
+
+                                // Remove from collidable list at next check
+                                collidableObjects.splice(i, 1);
+                                i--; // Adjust index
                             }
 
-                            // Remove from collidable list at next check
-                            collidableObjects.splice(i, 1);
-                            i--; // Adjust index
+                            // Apply physics effect - bounce back based on collision normal
+                            const bounceFactor = impactForce * 0.015; // Reduced bounce factor
+                            car.position.x += collisionNormal.x * bounceFactor;
+                            car.position.z += collisionNormal.z * bounceFactor;
+
+                            // Reduce car speed based on angle of impact
+                            carSpeed = -carSpeed * (0.3 * impactAngle); // More realistic bounce back
                         }
-
-                        // Apply physics effect - bounce back
-                        const bounceX = Math.sin(carRotation) * -1;
-                        const bounceZ = Math.cos(carRotation) * -1;
-
-                        // The faster the car was going, the more it bounces back
-                        const bounceFactor = impactForce * 0.02;
-
-                        car.position.x += bounceX * bounceFactor;
-                        car.position.z += bounceZ * bounceFactor;
-
-                        // Reduce car speed
-                        carSpeed = -carSpeed * 0.3; // Bounce back at reduced speed
                     }
                 }
             }
