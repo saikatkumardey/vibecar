@@ -2047,7 +2047,7 @@
 
             // Reset car position
             if (keyStates['r']) {
-                car.position.set(0, 0, 0);
+                car.position.set(0, 3, 0);
                 carSpeed = 0;
                 carRotation = 0;
             }
@@ -2244,7 +2244,7 @@
                     // Parameters for patterns
                     const amplitude = (ROAD_WIDTH * 0.4) * randomFromSeed(seed + chainIdx * 77); // How wide the pattern is
                     const frequency = 0.1 + randomFromSeed(seed + chainIdx * 88) * 0.2; // How tight the curves are
-                    const chainSpacing = 2 + randomFromSeed(seed + chainIdx * 66) * 3; // Space between coins
+                    const chainSpacing = 3 + randomFromSeed(seed + chainIdx * 66) * 3; // Space between coins
 
                     // Generate coins based on the pattern
                     for (let i = 0; i < chainLength; i++) {
@@ -2297,7 +2297,7 @@
                 color = 0xff0000; // Red
 
                 // Create a cross/medical symbol for health
-                const baseSize = 0.8;
+                const baseSize = 5;
                 const material = new THREE.MeshPhongMaterial({
                     color: color,
                     emissive: color,
@@ -2317,11 +2317,11 @@
                 color = 0xffcc00; // Gold
 
                 // Create a spinning coin
-                geometry = new THREE.CylinderGeometry(0.8, 0.8, 0.2, 32);
+                geometry = new THREE.CylinderGeometry(3, 3, 0.1, 32);
                 const material = new THREE.MeshPhongMaterial({
                     color: color,
                     emissive: color,
-                    emissiveIntensity: 0.3
+                    emissiveIntensity: 0.5
                 });
                 const coin = new THREE.Mesh(geometry, material);
 
@@ -2333,14 +2333,14 @@
 
             // Add floating animation data to userData
             reward.userData = {
-                floatHeight: 0.5 + Math.random() * 0.5,
+                floatHeight: 1 + Math.random() * 0.5,
                 floatSpeed: 1 + Math.random() * 0.5,
                 rotateSpeed: 1 + Math.random() * 2,
                 startTime: Math.random() * Math.PI * 2 // Random start phase
             };
 
             // Position above ground
-            reward.position.set(x, 1.0, z);
+            reward.position.set(x, 0, z + 1);
 
             return reward;
         }
