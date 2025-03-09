@@ -132,6 +132,51 @@
             display: none;
         }
 
+        #speedometer {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            height: 400px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            padding: 15px;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #speed-gauge {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        #speed-value {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-weight: bold;
+            font-size: 42px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            z-index: 2;
+        }
+
+        #speed-unit {
+            position: absolute;
+            top: 75%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
         #loading-screen {
             position: absolute;
             top: 0;
@@ -249,6 +294,43 @@
         M - Mute/Unmute Sound<br>
         C - Toggle Camera Mode
     </div>
+    <div id="speedometer">
+        <div id="speed-gauge">
+            <svg width="100%" height="100%" viewBox="0 0 100 60">
+                <!-- Outer decorative arc -->
+                <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="rgba(255, 255, 255, 0.1)" stroke-width="8"
+                    stroke-linecap="round" />
+
+                <!-- Background arc -->
+                <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="rgba(255, 255, 255, 0.05)" stroke-width="6"
+                    stroke-linecap="round" />
+
+                <!-- Speed indicator arc -->
+                <path id="speed-indicator" d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="url(#speed-gradient)"
+                    stroke-width="6" stroke-linecap="round" />
+
+                <!-- Gradient definition -->
+                <defs>
+                    <linearGradient id="speed-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color: #ff0000; stop-opacity: 1" />
+                        <stop offset="50%" style="stop-color: #ffff00; stop-opacity: 1" />
+                        <stop offset="100%" style="stop-color: #00ff00; stop-opacity: 1" />
+                    </linearGradient>
+                </defs>
+
+                <!-- Speed markers with glow effect -->
+                <g style="font-family: Arial; font-size: 6px; fill: rgba(255, 255, 255, 0.5)">
+                    <text x="8" y="55">0</text>
+                    <text x="28" y="40">25</text>
+                    <text x="48" y="35">50</text>
+                    <text x="68" y="40">75</text>
+                    <text x="85" y="55">100</text>
+                </g>
+            </svg>
+            <div id="speed-value">0</div>
+            <div id="speed-unit">km/h</div>
+        </div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/objects/Sky.js"></script>
@@ -270,9 +352,9 @@
             return geometry;
         }
         // Game constants and variables
-        const CHUNK_SIZE = 300;
+        const CHUNK_SIZE = 200;
         const RENDER_DISTANCE = 3;
-        const ROAD_WIDTH = 25;
+        const ROAD_WIDTH = 50;
 
         let scene, camera, renderer;
         let controls; // For orbit controls
@@ -339,7 +421,7 @@
         };
 
         // FPS calculation variables
-        const fpsBufferSize = 60; // Average over the last 60 frames
+        const fpsBufferSize = 20; // Average over the last 60 frames
         let fpsBuffer = [];
         let lastFrameTime = performance.now();
 
@@ -353,6 +435,7 @@
                 document.getElementById('fps').style.display = 'block';
                 document.getElementById('health-container').style.display = 'block';
                 document.getElementById('coins-container').style.display = 'block';
+                document.getElementById('speedometer').style.display = 'block';
                 startGame();
             }, 300);
         });
@@ -638,12 +721,12 @@
             scene = new THREE.Scene();
             // Use a color that matches with the Sky
             scene.background = new THREE.Color(0x8FBCD4); // Sky blue that matches the Sky object
-            scene.fog = new THREE.FogExp2(0x8FBCD4, 0.002);
+            scene.fog = new THREE.FogExp2(0x8FBCD4, 0.001);
 
             // Set up camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.5, 1000);
-            camera.position.set(0, 10, 20);
-            camera.lookAt(0, 20, 0); // Look more toward the horizon initially
+            camera.position.set(0, 50, 20); // Lower height and same distance
+            camera.lookAt(0, 20, -10); // Look more at the car's center
 
             // Add orbit controls to allow camera manipulation with mouse
             controls = new THREE.OrbitControls(camera, document.body);
@@ -657,7 +740,7 @@
             controls.enabled = false; // Disabled by default, enable with 'C' key
 
             // Set up renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -668,7 +751,7 @@
             createSky();
 
             // Add lights
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
             scene.add(ambientLight);
 
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -687,9 +770,6 @@
             // Add scene elements
             scene.add(terrain);
             createCar();
-
-            // Generate initial chunks - now moved to startGame() for immediate rendering
-            // updateChunks();
 
             // Add event listeners
             window.addEventListener('resize', onWindowResize);
@@ -985,7 +1065,7 @@
                 ];
                 let bodyGeo = createBufferGeometry(bodyVertices, bodyFacesArr);
                 let bodyMat = new THREE.MeshStandardMaterial({
-                    color: 0xffffff,
+                    color: 0x6B7079,
                     wireframe: this.wireframes,
                     polygonOffset: true,
                     polygonOffsetFactor: 1,
@@ -1000,8 +1080,8 @@
                     wireframe: this.wireframes,
                     // transparent: true,
                     // opacity: 0.8,      // More opaque
-                    // metalness: 0.8,    // Slight metal look
-                    // roughness: 1,    // Smooth surface (more reflective)
+                    metalness: 0.8,    // Slight metal look
+                    roughness: 1,    // Smooth surface (more reflective)
                     reflectivity: 1.0, // Maximum reflectivity
                     clearcoat: 1.0,    // Glass-like coating
                     // wireframe: this.wireframes,
@@ -1129,14 +1209,14 @@
                 this.mesh.add(backLight);
 
                 // VI. Wheels (using CylinderBufferGeometry – unchanged)
-                const wheelGeo = new THREE.CylinderBufferGeometry(H * 0.23, H * 0.23, W * 0.14, 32);
+                const wheelGeo = new THREE.CylinderBufferGeometry(H * 0.25, H * 0.25, W * 0.3, 32);
                 const wheelMat = new THREE.MeshLambertMaterial({
                     color: 0x1c1c1c,
                     wireframe: this.wireframes
                 });
                 this.wheels = [new THREE.Mesh(wheelGeo, wheelMat)];
                 let wheelHub = new THREE.Object3D();
-                wheelHub.position.y = W * 0.075;
+                wheelHub.position.y = W * 0.0025;
                 this.wheels[0].add(wheelHub);
                 let hubBaseGeo = new THREE.CylinderBufferGeometry(H * 0.16, H * 0.17, W * 0.01, 7);
                 let hubBaseMat = new THREE.MeshStandardMaterial({
@@ -1294,14 +1374,15 @@
             // Configure road texture
             roadTexture.wrapS = THREE.RepeatWrapping;
             roadTexture.wrapT = THREE.RepeatWrapping;
-            roadTexture.repeat.set(1, 20);
+            roadTexture.repeat.set(1, 10);
 
             const roadGeometry = new THREE.PlaneGeometry(ROAD_WIDTH, CHUNK_SIZE);
             const roadMaterial = new THREE.MeshPhongMaterial({
                 color: 0xffffff, // grey,
                 map: roadTexture,
                 bumpMap: roadTexture,
-                bumpScale: 0.1
+                opacity: 0.5,
+                bumpScale: 0.5
             });
 
             const road = new THREE.Mesh(roadGeometry, roadMaterial);
@@ -1403,7 +1484,7 @@
             // Add rocks
             const numRocks = 2;
             // Load rock texture once and reuse
-            const rockTexture = textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/brick_diffuse.jpg');
+            const rockTexture = textureLoader.load('https://raw.githubusercontent.com/saikatkumardey/vibecar/6209affccb02862da81138e8452f98241e5e1860/assets/skins/rock_texture.png');
 
             // Configure rock texture for better performance
             rockTexture.wrapS = THREE.RepeatWrapping;
@@ -2015,7 +2096,7 @@
 
             // Acceleration and braking
             const acceleration = 20;
-            const maxSpeed = 100;
+            const maxSpeed = 180;
             const deceleration = 15;
             const brakeStrength = 40;
 
@@ -2068,13 +2149,40 @@
             car.position.z += moveZ;
 
             // Simulate wheel rotation based on speed
-            const wheelRotationSpeed = carSpeed * deltaTime * 0.1;
+            const wheelRotationSpeed = carSpeed * deltaTime * 0.3 + 0.5;
             wheels.forEach(wheel => {
                 wheel.rotation.x -= wheelRotationSpeed;
             });
 
             // Update speed indicator
             infoElement.textContent = `Speed: ${Math.abs(carSpeed).toFixed(0)} km/h`;
+
+            // Update speedometer
+            const speedValue = Math.abs(carSpeed).toFixed(0);
+            document.getElementById('speed-value').textContent = speedValue;
+
+            // Update speed indicator arc with smooth animation
+            const speedPercent = Math.min(100, Math.abs(carSpeed)) / 100;
+            const speedIndicator = document.getElementById('speed-indicator');
+            const startAngle = Math.PI;
+            const endAngle = 0;
+            const angle = startAngle + (endAngle - startAngle) * speedPercent;
+            const x = 50 + 40 * Math.cos(angle);
+            const y = 50 + 40 * Math.sin(angle);
+            speedIndicator.setAttribute('d', `M10,50 A40,40 0 0,1 ${x},${y}`);
+
+            // Update speed value color based on speed with glow effect
+            const speedValueElement = document.getElementById('speed-value');
+            if (speedValue > 80) {
+                speedValueElement.style.color = '#ff5555';
+                speedValueElement.style.textShadow = '0 0 10px rgba(255, 0, 0, 0.5)';
+            } else if (speedValue > 40) {
+                speedValueElement.style.color = '#ffff00';
+                speedValueElement.style.textShadow = '0 0 10px rgba(255, 255, 0, 0.5)';
+            } else {
+                speedValueElement.style.color = '#55ff55';
+                speedValueElement.style.textShadow = '0 0 10px rgba(0, 255, 0, 0.5)';
+            }
         }
 
         // Position the camera to follow the car
@@ -2084,15 +2192,15 @@
                 if (controls) {
                     controls.target.set(
                         car.position.x,
-                        car.position.y + 3,
-                        car.position.z
+                        car.position.y + 20, // Look at a lower point
+                        car.position.z + 40
                     );
                 }
                 return; // Skip the rest of the function
             }
 
             const cameraOffset = new THREE.Vector3();
-            cameraOffset.set(0, 10, -30);
+            cameraOffset.set(0, 12, -40); // Lower height and closer to car
             cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), carRotation);
 
             camera.position.x = car.position.x + cameraOffset.x;
@@ -2101,7 +2209,7 @@
 
             camera.lookAt(
                 car.position.x,
-                car.position.y + 3,
+                car.position.y, // Look at a lower point
                 car.position.z
             );
         }
@@ -2297,17 +2405,17 @@
                 color = 0xff0000; // Red
 
                 // Create a cross/medical symbol for health
-                const baseSize = 5;
+                const baseSize = 20;
                 const material = new THREE.MeshPhongMaterial({
                     color: color,
                     emissive: color,
-                    emissiveIntensity: 0.5
+                    emissiveIntensity: 0.8
                 });
 
-                const verticalPart = new THREE.BoxGeometry(0.4, 1.2, 0.2);
+                const verticalPart = new THREE.BoxGeometry(0.8, 2.4, 0.4);
                 const vertical = new THREE.Mesh(verticalPart, material);
 
-                const horizontalPart = new THREE.BoxGeometry(1.2, 0.4, 0.2);
+                const horizontalPart = new THREE.BoxGeometry(2.4, 0.8, 0.4);
                 const horizontal = new THREE.Mesh(horizontalPart, material);
 
                 reward.add(vertical);
@@ -2340,7 +2448,7 @@
             };
 
             // Position above ground
-            reward.position.set(x, 0, z + 1);
+            reward.position.set(x, 8, z);  // Set to 8 units high
 
             return reward;
         }
@@ -2362,7 +2470,7 @@
                 const rotateSpeed = reward.userData.rotateSpeed || 1;
 
                 // Float up and down
-                reward.position.y = 1.0 + Math.sin((time + startTime) * floatSpeed) * floatHeight;
+                reward.position.y = 3 + Math.sin((time + startTime) * floatSpeed) * floatHeight;
 
                 // Rotate
                 reward.rotation.y += rotateSpeed * deltaTime;
