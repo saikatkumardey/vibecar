@@ -46,7 +46,7 @@ let damageCooldown = 500; // ms between collision damage
 // Rocks variables
 let rollingRocks = [];
 let lastRockSpawnTime = 0;
-let rockSpawnInterval = 3000; // Increased to 3 seconds between rock spawns
+let rockSpawnInterval = 500; // Increased to 3 seconds between rock spawns
 let isGameOver = false; // Track game over state
 
 // Reward items
@@ -188,6 +188,19 @@ function initRewardAssets() {
     rewardAssets.initialized = true;
 }
 
+// Wait for page load to initialize the 3D world
+document.addEventListener('DOMContentLoaded', function () {
+    // Initialize the 3D scene first so it's visible behind the loading screen
+    init();
+
+    // Force an initial render to show the world immediately
+    updateChunks();
+    renderer.render(scene, camera);
+
+    // Start animation loop
+    animate();
+});
+
 // Wait for start button click to initialize game
 document.getElementById('start-button').addEventListener('click', function () {
     // User has interacted with the page, now we can create and start audio
@@ -216,38 +229,62 @@ document.getElementById('start-button').addEventListener('click', function () {
         }
     }
 
-    document.getElementById('loading-screen').classList.add('fade-out');
+    // Animate the glass door effect
+    const leftDoor = document.getElementById('loading-left-door');
+    const rightDoor = document.getElementById('loading-right-door');
+    const loadingScreen = document.getElementById('loading-screen');
+
+    // Step 1: Fade out the content of the loading screen
+    loadingScreen.style.opacity = '0';
+
+    // Step 2: After content fades, open the doors
     setTimeout(() => {
-        document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('info').style.display = 'block';
-        document.getElementById('controls').style.display = 'block';
-        document.getElementById('fps').style.display = 'block';
-        document.getElementById('health-container').style.display = 'block';
-        document.getElementById('coins-container').style.display = 'block';
-        document.getElementById('speedometer').style.display = 'block';
-        startGame();
-    }, 300);
+        leftDoor.style.transform = 'translateX(-100%)';
+        rightDoor.style.transform = 'translateX(100%)';
+
+        // Step 3: After doors open, start the game
+        setTimeout(() => {
+            // Hide loading screen and doors completely
+            document.getElementById('loading-screen').style.display = 'none';
+            leftDoor.style.display = 'none';
+            rightDoor.style.display = 'none';
+
+            // Show game UI with a glass-like appearance
+            document.getElementById('info').style.display = 'block';
+            document.getElementById('controls').style.display = 'block';
+            document.getElementById('fps').style.display = 'block';
+            document.getElementById('health-container').style.display = 'block';
+            document.getElementById('coins-container').style.display = 'block';
+            document.getElementById('speedometer').style.display = 'block';
+
+            // Finish game initialization (without re-initializing 3D scene)
+            completeGameStart();
+        }, 800); // Reduced from 1000ms for a quicker transition
+    }, 250); // Reduced from 300ms for a quicker fade
 });
 
-// Initialize the game
-function startGame() {
+// Complete game initialization after user interaction
+function completeGameStart() {
     infoElement = document.getElementById('info');
     controlsElement = document.getElementById('controls');
     healthFill = document.getElementById('health-fill');
     gameStarted = true;
     carHealth = 100;
     updateHealthBar();
-    init();
-    initAudio();  // Uncommented to initialize audio
+    initAudio();  // Initialize audio
 
     // Initialize rocks system
     rollingRocks = [];
     lastRockSpawnTime = performance.now() - rockSpawnInterval - 100; // Ensure a rock spawns right away
-    console.log("Game started - rocks system initialized");// Wait 2 seconds after game start
+    console.log("Game started - rocks system initialized");
+}
 
-    // Force an initial render to show the world immediately
-    updateChunks();
-    renderer.render(scene, camera);
+// Initialize the game
+function startGame() {
+    // This function is no longer needed - logic has been moved to completeGameStart()
+    // Keeping it for compatibility but it should no longer be called
+    console.warn("startGame() is deprecated - use completeGameStart() instead");
+    completeGameStart();
 }
 
 // Initialize audio context and load sounds
@@ -558,8 +595,9 @@ class TuneJS {
         this.collisionSynth.volume.value = volume;
         this.collisionFilter.frequency.value = 400 + normalizedForce * 1000;
 
-        // Trigger the sound
-        this.collisionSynth.triggerAttackRelease("8n");
+        // Add a small time offset to avoid timing conflicts
+        // Using "+" notation to add a small delay from the current time
+        this.collisionSynth.triggerAttackRelease("8n", "+0.01");
     }
 
     playTireScreechSound(intensity = 1) {
@@ -1999,6 +2037,9 @@ function createTightCollisionBox(object) {
 
 // Check collisions and handle them
 function checkCollisions() {
+    // Don't check collisions if the game is over
+    if (isGameOver) return;
+
     // Update car collision box with tighter bounds
     carCollisionBox = createTightCollisionBox(car);
 
@@ -2041,6 +2082,9 @@ function checkCollisions() {
             // Check if this is a rock - specifically look for the rock hazard type
             if (object.userData.hazardType === 'rock') {
                 console.log("Hit a rock! Impact force:", impactForce);
+                if (isGameOver) {
+                    return;
+                }
 
                 // Play a collision effect without destroying the rock
                 createRockCollisionEffect(object.position.clone(), object.userData.size * 0.5);
@@ -2108,64 +2152,54 @@ function checkCollisions() {
 
 // Create a visual effect when a rock is hit
 function createRockCollisionEffect(position, size) {
-    // Create particle system for rock debris
-    const particleCount = 20 + Math.floor(size * 10);
+    // Create a simplified particle system with fewer particles
+    const particleCount = Math.min(10, Math.floor(10 * size)); // Limit max particles
     const particleGeometry = new THREE.BufferGeometry();
 
-    const positionArray = [];
-    const velocityArray = [];
-    const colorArray = [];
+    // Create arrays for positions and velocities
+    const positions = new Float32Array(particleCount * 3);
+    const velocities = new Float32Array(particleCount * 3);
 
-    // Create particle positions and velocities
+    // Create rock debris particles with random positions
     for (let i = 0; i < particleCount; i++) {
-        // Random position within rock radius
-        const angle = Math.random() * Math.PI * 2;
-        const radius = Math.random() * size;
-        const x = position.x + Math.cos(angle) * radius * 0.5;
-        const y = position.y + (Math.random() - 0.5) * size;
-        const z = position.z + Math.sin(angle) * radius * 0.5;
+        const i3 = i * 3;
 
-        // Add position
-        positionArray.push(x, y, z);
+        // Position around impact point with random offset
+        positions[i3] = position.x + (Math.random() - 0.5) * size;
+        positions[i3 + 1] = position.y + (Math.random() - 0.5) * size;
+        positions[i3 + 2] = position.z + (Math.random() - 0.5) * size;
 
-        // Add velocity (radial outward)
-        const vx = Math.cos(angle) * (2 + Math.random() * 5);
-        const vy = 1 + Math.random() * 5; // Upward
-        const vz = Math.sin(angle) * (2 + Math.random() * 5);
-        velocityArray.push(vx, vy, vz);
-
-        // Colors - orange/red for stone
-        const r = 0.8 + Math.random() * 0.2;
-        const g = 0.3 + Math.random() * 0.3;
-        const b = 0.1 + Math.random() * 0.2;
-        colorArray.push(r, g, b);
+        // Random velocity - mostly upward and outward
+        velocities[i3] = (Math.random() - 0.5) * 2; // x
+        velocities[i3 + 1] = Math.random() * 3; // y (up)
+        velocities[i3 + 2] = (Math.random() - 0.5) * 2; // z
     }
 
-    // Add attributes to geometry
-    particleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positionArray, 3));
-    particleGeometry.setAttribute('velocity', new THREE.Float32BufferAttribute(velocityArray, 3));
-    particleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colorArray, 3));
+    // Set attributes for the geometry
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particleGeometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
 
-    // Create point material
+    // Create material with simplified settings
     const particleMaterial = new THREE.PointsMaterial({
-        size: 0.5,
-        vertexColors: true,
-        blending: THREE.AdditiveBlending,
+        color: 0xbbbbbb,
+        size: size * 0.2,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.7
     });
 
-    // Create particle system
+    // Create the particle system
     const particles = new THREE.Points(particleGeometry, particleMaterial);
+
+    // Set lifetime
     particles.userData = {
         createdAt: performance.now(),
-        lifetime: 2000 // 2 seconds
+        lifetime: 1000 // 1 second (shorter than before)
     };
 
     // Add to scene
     scene.add(particles);
 
-    // Add update function to animation loop
+    // Simplify the update function - use fewer calculations per frame
     const updateParticles = (timestamp) => {
         const age = timestamp - particles.userData.createdAt;
         const lifeRatio = age / particles.userData.lifetime;
@@ -2176,24 +2210,24 @@ function createRockCollisionEffect(position, size) {
             return;
         }
 
-        // Update positions based on velocity
+        // Update positions based on velocity - fewer calculations per frame
         const positions = particles.geometry.attributes.position.array;
         const velocities = particles.geometry.attributes.velocity.array;
 
         for (let i = 0; i < positions.length; i += 3) {
-            // Apply velocity
-            positions[i] += velocities[i] * 0.016; // x
-            positions[i + 1] += velocities[i + 1] * 0.016 - 0.098; // y with gravity
-            positions[i + 2] += velocities[i + 2] * 0.016; // z
+            // Apply velocity with simplified physics
+            positions[i] += velocities[i] * 0.015; // x
+            positions[i + 1] += velocities[i + 1] * 0.015 - 0.09; // y with simplified gravity
+            positions[i + 2] += velocities[i + 2] * 0.015; // z
 
-            // Reduce y velocity (gravity)
-            velocities[i + 1] -= 0.2;
+            // Apply simplified gravity
+            velocities[i + 1] -= 0.15;
         }
 
         particles.geometry.attributes.position.needsUpdate = true;
 
-        // Fade out with age
-        particles.material.opacity = 1 - lifeRatio;
+        // Fade out with age - simplified
+        particles.material.opacity = 0.7 * (1 - lifeRatio);
 
         // Request next update
         requestAnimationFrame(updateParticles);
@@ -2202,8 +2236,8 @@ function createRockCollisionEffect(position, size) {
     // Start update loop
     requestAnimationFrame(updateParticles);
 
-    // Play a rock shatter sound
-    playCollisionSound(10 + size * 5);
+    // Play a rock impact sound
+    playCollisionSound(Math.min(15, 8 + size * 2)); // Limit max volume
 }
 
 // Damage the car from collision
@@ -2247,17 +2281,9 @@ function updateHealthBar() {
 
 // Flash the screen red to indicate damage
 function flashDamageIndicator() {
-    // Create a full-screen red overlay
+    // Create a full-screen red overlay with glass effect
     const overlay = document.createElement('div');
-    overlay.style.position = 'absolute';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
-    overlay.style.pointerEvents = 'none';
-    overlay.style.transition = 'opacity 0.5s';
-    overlay.style.zIndex = '10';
+    overlay.className = 'glass-overlay damage-overlay';
 
     document.body.appendChild(overlay);
 
@@ -2485,19 +2511,19 @@ function animate() {
     const deltaMs = currentTime - lastFrameTime;
     lastFrameTime = currentTime;
 
-    if (gameStarted) {
-        // Add current fps to buffer
+    if (!gameStarted) return;
+
+    // Add current fps to buffer - only sample every other frame for better performance
+    if (Math.floor(currentTime / 50) % 2 === 0) {
         fpsBuffer.push(1000 / deltaMs);
         // Keep buffer at the right size
         while (fpsBuffer.length > fpsBufferSize) {
             fpsBuffer.shift();
         }
 
-        // Calculate average FPS
-        const averageFps = fpsBuffer.reduce((a, b) => a + b, 0) / fpsBuffer.length;
-
         // Update FPS display every 10 frames for better readability
         if (fpsBuffer.length % 10 === 0) {
+            const averageFps = fpsBuffer.reduce((a, b) => a + b, 0) / fpsBuffer.length;
             const fpsElement = document.getElementById('fps');
             fpsElement.textContent = `FPS: ${Math.round(averageFps)}`;
 
@@ -2510,30 +2536,52 @@ function animate() {
                 fpsElement.style.color = '#ff0000'; // Red for poor performance
             }
         }
-
-        // Use deltaMs instead of the Three.js clock for consistent timing
-        const deltaTime = deltaMs / 1000; // Convert to seconds
-
-        // Only process inputs if game is not over
-        if (!isGameOver) {
-            handleInput(deltaTime);
-        }
-
-        updateCamera();
-        updateChunks();
-        updateSky(deltaTime);
-        updateRewards(deltaTime);
-        // Make sure rolling rocks are updated in every frame
-        updateRollingRocks(deltaTime);
-
-        // Update engine sound
-        updateEngineSound();
-
-        // Check for collisions with environment
-        checkCollisions();
-
-        renderer.render(scene, camera);
     }
+
+    // Use deltaMs instead of the Three.js clock for consistent timing
+    const deltaTime = Math.min(deltaMs / 1000, 0.1); // Cap deltaTime to prevent huge jumps
+
+    // Only process inputs if game is not over
+    if (!isGameOver) {
+        handleInput(deltaTime);
+    } else {
+        // Update camera position every frame
+        gameOver();
+    }
+
+    // Update camera position every frame
+    updateCamera();
+
+    // Spread out expensive operations across frames
+    const frameId = Math.floor(currentTime / 16); // ~60fps target
+
+    // Always update chunks for continuous world generation
+    updateChunks();
+
+    // Stagger less critical updates
+    if (frameId % 2 === 0) {
+        // Every other frame
+        updateRewards(deltaTime);
+    }
+
+    if (frameId % 3 === 0) {
+        // Every third frame
+        updateSky(deltaTime * 3); // Compensate for less frequent updates
+    }
+
+    // Always update rocks (gameplay critical)
+    updateRollingRocks(deltaTime);
+
+    // Update engine sound less frequently
+    if (frameId % 4 === 0) {
+        updateEngineSound();
+    }
+
+    // Always check collisions for gameplay
+    checkCollisions();
+
+    // Render the scene
+    renderer.render(scene, camera);
 }
 
 // Add reward items to the road in a chunk
@@ -2656,43 +2704,40 @@ function createRewardItem(type, x, z) {
 function updateRewards(deltaTime) {
     const time = performance.now() / 1000;
 
-    for (let i = 0; i < rewardItems.length; i++) {
-        const reward = rewardItems[i];
+    // Limit the number of rewards we update each frame
+    const maxUpdatesPerFrame = 15;
+    const activeRewards = rewardItems.filter(reward => !reward.userData.collected);
 
-        // Skip collected rewards
-        if (reward.userData.collected) continue;
+    // Only process a subset of rewards per frame if there are too many
+    const rewardsToUpdate = activeRewards.length <= maxUpdatesPerFrame ?
+        activeRewards :
+        activeRewards.slice(Math.floor(time * 10) % Math.max(1, activeRewards.length - maxUpdatesPerFrame),
+            Math.floor(time * 10) % Math.max(1, activeRewards.length - maxUpdatesPerFrame) + maxUpdatesPerFrame);
 
-        // Floating animation
-        const floatHeight = reward.userData.floatHeight || 0.5;
+    for (let i = 0; i < rewardsToUpdate.length; i++) {
+        const reward = rewardsToUpdate[i];
+
+        // Simplified animation - use fewer calculations
+        // Float up and down with simplified math
+        const floatHeight = reward.userData.floatHeight || 0.3; // Reduced range
         const floatSpeed = reward.userData.floatSpeed || 1;
-        const startTime = reward.userData.startTime || 0;
-        const rotateSpeed = reward.userData.rotateSpeed || 1;
+        const timeOffset = reward.position.x * 100 + reward.position.z; // Use position for offset instead of storing extra data
 
-        // Float up and down
-        reward.position.y = reward.userData.baseHeight || 4 + Math.sin((time + startTime) * floatSpeed) * floatHeight;
+        // Simplify the sin calculation by using a lower precision
+        reward.position.y = (reward.userData.baseHeight || 4) +
+            Math.sin((time + timeOffset * 0.001) * floatSpeed) * floatHeight;
 
-        // Rotate slightly
-        reward.rotation.y += rotateSpeed * deltaTime;
+        // Rotate slightly - use simplified rotation
+        reward.rotation.y += deltaTime * 0.5;
 
-        // Apply subtle swaying motion for balloons
+        // Simplify balloon-specific animations
         if (reward.userData.rewardType === 'points') {
-            reward.rotation.z = Math.sin((time + startTime) * 0.5) * 0.1;
-
-            // Subtle scale pulsing for balloons
-            const scaleVar = reward.userData.scaleVariation || 0.05;
-            const basScale = reward.userData.baseScale || 1;
-            const scaleFactor = basScale + Math.sin((time + startTime) * 0.7) * scaleVar;
-            reward.scale.set(scaleFactor, scaleFactor, scaleFactor);
-        }
-
-        // Pulsing animation for health pickups
-        if (reward.userData.pulse) {
-            const pulseScale = 1 + Math.sin(time * 2) * 0.1;
-            reward.scale.set(pulseScale, pulseScale, pulseScale);
+            // Apply only the most visually important effect: slight swaying
+            reward.rotation.z = Math.sin((time + timeOffset * 0.001) * 0.3) * 0.08;
         }
     }
 
-    // Check for reward collection
+    // Check for reward collection every time
     checkRewardCollection();
 }
 
@@ -2861,60 +2906,52 @@ function checkRewardCollection() {
 function showBalloonPopup(balloonType) {
     const popup = document.getElementById('coin-chain-popup');
 
-    // Set the text with a plus sign and balloon emoji
-    popup.textContent = `+1 🎈`;
-
-    // Set text color based on balloon type
-    let color;
-    switch (balloonType) {
-        case 'red': color = '#ff5555'; break;
-        case 'blue': color = '#5588ff'; break;
-        case 'green': color = '#55dd55'; break;
-        case 'yellow': color = '#ffcc44'; break;
-        case 'purple': color = '#bb55ff'; break;
-        case 'orange': color = '#ff8844'; break;
-        default: color = '#ffffff';
+    // Apply glass-popup class (already added in HTML)
+    if (!popup.classList.contains('glass-popup')) {
+        popup.classList.add('glass-popup');
     }
 
-    popup.style.color = color;
-    popup.style.borderColor = color;
+    // Update content based on type
+    switch (balloonType) {
+        case 'health':
+            popup.innerHTML = '+20 ❤️';
+            popup.style.color = '#ff5555';
+            break;
+        case 'chain':
+            popup.innerHTML = `×${currentChainCoins} 🎈`;
+            popup.style.color = '#ffcc00';
+            break;
+        default:
+            popup.innerHTML = '+1 🎈';
+            popup.style.color = '#ffffff';
+    }
 
-    // Add some text shadow for better visibility
-    popup.style.textShadow = '0 0 5px rgba(0, 0, 0, 0.7)';
+    // Show popup with animation
+    popup.style.display = 'block';
+    popup.style.opacity = '0';
+    popup.style.transform = 'translate(-50%, 20px)';
 
-    // Make visible with animation
-    popup.style.opacity = '1';
-    popup.style.transform = 'translateY(0) scale(1.2)';
+    requestAnimationFrame(() => {
+        popup.style.opacity = '1';
+        popup.style.transform = 'translate(-50%, 0)';
 
-    // Play a collect sound
-    playCollectSound();
-
-    // Animate and fade out
-    setTimeout(() => {
-        popup.style.transform = 'translateY(-30px) scale(1.0)';
-
+        // Hide popup after animation
         setTimeout(() => {
             popup.style.opacity = '0';
+            popup.style.transform = 'translate(-50%, -20px)';
+
             setTimeout(() => {
-                popup.style.transform = 'translateY(0) scale(1.0)';
+                popup.style.display = 'none';
             }, 300);
-        }, 700);
-    }, 300);
+        }, 2000);
+    });
 }
 
 // Flash health increase indicator
 function flashHealthIndicator() {
-    // Create a green overlay for health increase
+    // Create a green overlay with glass effect
     const overlay = document.createElement('div');
-    overlay.style.position = 'absolute';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(0, 255, 0, 0.2)';
-    overlay.style.pointerEvents = 'none';
-    overlay.style.transition = 'opacity 0.5s';
-    overlay.style.zIndex = '10';
+    overlay.className = 'glass-overlay health-overlay';
 
     document.body.appendChild(overlay);
 
@@ -2929,17 +2966,9 @@ function flashHealthIndicator() {
 
 // Flash points indicator
 function flashPointsIndicator() {
-    // Create a gold overlay for points
+    // Create a gold overlay with glass effect
     const overlay = document.createElement('div');
-    overlay.style.position = 'absolute';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(255, 215, 0, 0.2)';
-    overlay.style.pointerEvents = 'none';
-    overlay.style.transition = 'opacity 0.5s';
-    overlay.style.zIndex = '10';
+    overlay.className = 'glass-overlay points-overlay';
 
     document.body.appendChild(overlay);
 
@@ -3166,7 +3195,7 @@ function createRollingRock(x, z, size = 1) {
         damage: 10 + size * 10, // More damage for larger rocks
         destroyed: false,
         createdAt: performance.now(), // Track when the rock was created
-        mass: size * 5 // Property for physics calculations
+        mass: size * 2 // Property for physics calculations
     };
 
     // Add to scene and collidable objects
@@ -3276,22 +3305,20 @@ function gameOver() {
     console.log("GAME OVER - health reached zero");
     isGameOver = true;
 
-    // Create game over overlay
+    // Create game over overlay with glass effect
     const overlay = document.createElement('div');
     overlay.id = 'game-over-overlay';
+    overlay.className = 'glass-popup';
     overlay.style.position = 'absolute';
     overlay.style.top = '0';
     overlay.style.left = '0';
     overlay.style.width = '100%';
     overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-    overlay.style.color = '#ff0000';
     overlay.style.display = 'flex';
     overlay.style.flexDirection = 'column';
     overlay.style.justifyContent = 'center';
     overlay.style.alignItems = 'center';
     overlay.style.zIndex = '1000';
-    overlay.style.fontFamily = 'Arial, sans-serif';
     overlay.style.transition = 'opacity 1s ease';
     overlay.style.opacity = '0';
 
@@ -3301,38 +3328,86 @@ function gameOver() {
     gameOverText.style.fontSize = '5em';
     gameOverText.style.margin = '0 0 30px 0';
     gameOverText.style.textShadow = '0 0 10px #ff0000';
+    gameOverText.style.color = '#ff0000';
 
     // Score display
     const scoreText = document.createElement('h2');
     scoreText.textContent = `Final Score: ${coinsCollected}`;
     scoreText.style.fontSize = '2em';
     scoreText.style.margin = '0 0 50px 0';
+    scoreText.style.color = 'white';
 
     // Restart button
     const restartButton = document.createElement('button');
     restartButton.textContent = 'RESTART';
+    restartButton.className = 'pulse-glow';
     restartButton.style.padding = '15px 40px';
     restartButton.style.fontSize = '1.5em';
-    restartButton.style.backgroundColor = '#ff3333';
+    restartButton.style.background = 'linear-gradient(135deg, rgba(255, 51, 51, 0.9) 0%, rgba(204, 0, 0, 0.9) 100%)';
     restartButton.style.color = 'white';
     restartButton.style.border = 'none';
-    restartButton.style.borderRadius = '5px';
+    restartButton.style.borderRadius = '50px';
     restartButton.style.cursor = 'pointer';
     restartButton.style.transition = 'all 0.3s ease';
+    restartButton.style.boxShadow = '0 8px 24px rgba(255, 0, 0, 0.3)';
 
     restartButton.addEventListener('mouseover', () => {
-        restartButton.style.backgroundColor = '#ff0000';
-        restartButton.style.transform = 'scale(1.05)';
+        restartButton.style.background = 'linear-gradient(135deg, rgba(255, 0, 0, 0.95) 0%, rgba(204, 0, 0, 0.95) 100%)';
+        restartButton.style.transform = 'scale(1.05) translateY(-2px)';
+        restartButton.style.boxShadow = '0 12px 28px rgba(255, 0, 0, 0.4)';
     });
 
     restartButton.addEventListener('mouseout', () => {
-        restartButton.style.backgroundColor = '#ff3333';
+        restartButton.style.background = 'linear-gradient(135deg, rgba(255, 51, 51, 0.9) 0%, rgba(204, 0, 0, 0.9) 100%)';
         restartButton.style.transform = 'scale(1)';
+        restartButton.style.boxShadow = '0 8px 24px rgba(255, 0, 0, 0.3)';
     });
 
     restartButton.addEventListener('click', () => {
-        // Reload the page to restart
-        window.location.reload();
+        // Create sliding doors for transition
+        const leftDoor = document.createElement('div');
+        leftDoor.id = 'restart-left-door';
+        leftDoor.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: -50%;
+            height: 100%;
+            width: 50%;
+            background: linear-gradient(135deg, rgba(30, 42, 120, 0.6) 0%, rgba(15, 22, 66, 0.6) 100%);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            z-index: 1001;
+            transition: transform 0.8s cubic-bezier(0.7, 0, 0.3, 1);
+        `;
+
+        const rightDoor = document.createElement('div');
+        rightDoor.id = 'restart-right-door';
+        rightDoor.style.cssText = `
+            position: absolute;
+            top: 0;
+            right: -50%;
+            height: 100%;
+            width: 50%;
+            background: linear-gradient(135deg, rgba(30, 42, 120, 0.6) 0%, rgba(15, 22, 66, 0.6) 100%);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            z-index: 1001;
+            transition: transform 0.8s cubic-bezier(0.7, 0, 0.3, 1);
+        `;
+
+        document.body.appendChild(leftDoor);
+        document.body.appendChild(rightDoor);
+
+        // Animate doors closing
+        setTimeout(() => {
+            leftDoor.style.transform = 'translateX(100%)';
+            rightDoor.style.transform = 'translateX(-100%)';
+
+            // Reload the page after doors close
+            setTimeout(() => {
+                window.location.reload();
+            }, 800);
+        }, 50);
     });
 
     // Append elements to overlay
@@ -3351,9 +3426,57 @@ function gameOver() {
     // Stop player movement
     carVelocity.set(0, 0, 0);
     carSpeed = 0;
+}
 
-    // Play a game over sound if audio is available
-    if (typeof playCollisionSound === 'function') {
-        playCollisionSound(50); // Play a loud crash sound
+// Utility function to create glass UI overlays
+function createGlassOverlay(message, type = 'info', duration = 3000) {
+    // Create a glass overlay for UI messages
+    const overlay = document.createElement('div');
+    overlay.className = 'glass-popup';
+    overlay.style.position = 'absolute';
+    overlay.style.top = '50%';
+    overlay.style.left = '50%';
+    overlay.style.transform = 'translate(-50%, -50%)';
+    overlay.style.padding = '20px 40px';
+    overlay.style.zIndex = '500';
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.3s ease';
+
+    // Set style based on type
+    switch (type) {
+        case 'success':
+            overlay.style.borderLeft = '4px solid #00cc00';
+            break;
+        case 'warning':
+            overlay.style.borderLeft = '4px solid #ffcc00';
+            break;
+        case 'error':
+            overlay.style.borderLeft = '4px solid #ff0000';
+            break;
+        case 'info':
+        default:
+            overlay.style.borderLeft = '4px solid #00ccff';
+            break;
     }
+
+    // Add message
+    overlay.textContent = message;
+
+    // Add to document
+    document.body.appendChild(overlay);
+
+    // Fade in
+    setTimeout(() => {
+        overlay.style.opacity = '1';
+
+        // Fade out and remove after duration
+        setTimeout(() => {
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+            }, 300);
+        }, duration);
+    }, 10);
+
+    return overlay;
 }

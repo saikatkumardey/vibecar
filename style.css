@@ -1,7 +1,7 @@
 body {
     margin: 0;
     overflow: hidden;
-    font-family: 'Arial', sans-serif;
+    font-family: 'Montserrat', 'Segoe UI', 'Arial', sans-serif;
 }
 
 canvas {
@@ -176,7 +176,7 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, rgba(30, 42, 120, 0.8) 0%, rgba(15, 22, 66, 0.8) 100%);
+    background: rgba(10, 15, 30, 0.15);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -184,54 +184,101 @@ canvas {
     color: white;
     text-align: center;
     z-index: 100;
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.7, 0, 0.3, 1);
 }
 
 #loading-screen h1 {
-    font-size: 3em;
-    margin-bottom: 0.5em;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    font-size: 4em;
+    margin-bottom: 0.3em;
+    text-shadow: 0 0 15px rgba(0, 0, 0, 0.8), 0 0 5px rgba(0, 0, 0, 0.9);
+    font-weight: 700;
+    letter-spacing: 3px;
 }
 
 #instructions {
-    margin: 20px;
-    background-color: rgba(255, 255, 255, 0.15);
+    margin: 15px;
+    background-color: rgba(20, 25, 40, 0.4);
     padding: 20px;
-    border-radius: 10px;
+    border-radius: 12px;
     max-width: 500px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-weight: 300;
+    line-height: 1.5;
+}
+
+#instructions h2 {
+    font-weight: 600;
+    margin-top: 0;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+#instructions h3 {
+    font-weight: 500;
+    margin-top: 15px;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+}
+
+#instructions p {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    font-size: 1.1em;
 }
 
 #start-button {
-    margin-top: 30px;
-    padding: 15px 40px;
-    font-size: 1.2em;
-    background-color: #ffcc00;
-    color: #333;
+    margin-top: 25px;
+    padding: 12px 35px;
+    font-size: 1.1em;
+    background: linear-gradient(135deg, rgba(255, 204, 0, 0.85) 0%, rgba(255, 153, 0, 0.85) 100%);
+    color: #222;
     border: none;
     border-radius: 50px;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-weight: bold;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    letter-spacing: 1px;
 }
 
 #start-button:hover {
-    background-color: #ffd700;
-    transform: scale(1.05);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.9) 0%, rgba(255, 165, 0, 0.9) 100%);
+    transform: scale(1.05) translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
 .key {
     display: inline-block;
-    padding: 5px 10px;
-    background-color: rgba(255, 255, 255, 0.2);
+    padding: 3px 8px;
+    background-color: rgba(255, 255, 255, 0.15);
     border-radius: 4px;
     margin: 0 2px;
-    font-family: monospace;
+    font-family: 'Consolas', monospace;
+    font-weight: 500;
+}
+
+.controls-compact {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.controls-compact .key {
+    margin-right: 5px;
+}
+
+.danger-note {
+    font-size: 0.9em;
+    margin-top: 15px;
+    margin-bottom: 0;
 }
 
 .danger {
@@ -256,18 +303,9 @@ canvas {
 }
 
 .fade-out {
-    animation: fadeOut 1s forwards;
-}
-
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-    }
-
-    to {
-        opacity: 0;
-        visibility: hidden;
-    }
+    opacity: 0 !important;
+    visibility: hidden;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
 }
 
 #loading-progress {
@@ -303,4 +341,196 @@ canvas {
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
+}
+
+#camera-mode-info {
+    position: fixed;
+    top: 120px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 10px 15px;
+    border-radius: 5px;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Glass-door effect for UI elements */
+.glass {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* Modern transparent UI containers */
+.ui-container {
+    background: rgba(20, 20, 40, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.ui-container:hover {
+    background: rgba(30, 30, 60, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Glass door sliding effect */
+.slide-left {
+    transform: translateX(-100%);
+}
+
+.slide-right {
+    transform: translateX(100%);
+}
+
+/* Split door effect for loading screen */
+#loading-left-door,
+#loading-right-door {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 50%;
+    background: rgba(10, 15, 30, 0.15);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 99;
+    transition: transform 1.2s cubic-bezier(0.7, 0, 0.3, 1);
+}
+
+#loading-left-door {
+    left: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#loading-right-door {
+    right: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Updated UI elements with glass effect */
+#health-container,
+#coins-container,
+#fps,
+#info,
+#camera-mode-info {
+    background-color: rgba(20, 20, 40, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Updated keyframes for transitions */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideOpen {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-100%);
+    }
+}
+
+@keyframes slideOpenRight {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(100%);
+    }
+}
+
+/* Pulsing light effect for important elements */
+.pulse-glow {
+    animation: pulse-glow 2s infinite alternate;
+}
+
+@keyframes pulse-glow {
+    from {
+        box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+    }
+
+    to {
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+    }
+}
+
+/* Glass effect for overlays */
+.glass-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 90;
+    transition: opacity 0.5s ease;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+/* Damage overlay with glass effect */
+.damage-overlay {
+    background-color: rgba(255, 0, 0, 0.2);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+/* Health gain overlay with glass effect */
+.health-overlay {
+    background-color: rgba(0, 255, 0, 0.15);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+/* Points overlay with glass effect */
+.points-overlay {
+    background-color: rgba(255, 215, 0, 0.15);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+/* Updated Game Over overlay with glass effect */
+#game-over-overlay {
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+/* Glass-effect for popups */
+.glass-popup {
+    background-color: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    color: white;
+    text-align: center;
 }

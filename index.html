@@ -5,44 +5,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Open World Exploration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
+    <!-- Glass door elements for transition effect -->
+    <div id="loading-left-door"></div>
+    <div id="loading-right-door"></div>
+
     <div id="loading-screen">
         <h1>INFINITE ROADS</h1>
-        <div id="instructions">
+        <div id="instructions" class="glass">
             <h2>Welcome to the Open World</h2>
-            <p>Drive your sports car through an endless procedurally generated world. Explore forests, beaches, and
-                more!</p>
-            <h3>Controls:</h3>
-            <p><span class="key">W</span> or <span class="key">↑</span> - Accelerate</p>
-            <p><span class="key">S</span> or <span class="key">↓</span> - Brake/Reverse</p>
-            <p><span class="key">A</span> or <span class="key">←</span> - Turn Left</p>
-            <p><span class="key">D</span> or <span class="key">→</span> - Turn Right</p>
-            <p><span class="key">R</span> - Reset Car Position</p>
-            <p><span class="key">M</span> - Mute/Unmute Sound</p>
-            <p class="audio-note">Click START to enable audio and lo-fi soundtrack</p>
-            <h3>Hazards:</h3>
-            <p>Watch out for <span class="danger">rolling rocks</span> crossing the road! Collisions will damage your
-                vehicle.</p>
-            <p>If your health reaches zero, it's <span class="danger">GAME OVER</span>!</p>
+            <p>Drive your sports car through an endless procedurally generated world.</p>
+            <p class="danger-note">Watch for <span class="danger">rocks</span>!</p>
         </div>
-        <button id="start-button">START DRIVING</button>
+        <button id="start-button" class="pulse-glow">START DRIVING</button>
     </div>
 
-    <div id="info">Speed: 0 km/h</div>
-    <div id="fps">FPS: 0</div>
-    <div id="health-container">
+    <div id="info" class="ui-container">Speed: 0 km/h</div>
+    <div id="fps" class="ui-container">FPS: 0</div>
+    <div id="health-container" class="ui-container">
         <div id="health-label">Health:</div>
         <div id="health-bar">
             <div id="health-fill"></div>
         </div>
     </div>
-    <div id="coins-container">
+    <div id="coins-container" class="ui-container">
         <div id="coins-count">Score: 0</div>
     </div>
-    <div id="coin-chain-popup">+1 🎈</div>
+    <div id="coin-chain-popup" class="glass-popup">+1 🎈</div>
+    <div id="camera-mode-info" class="ui-container">Camera: chase</div>
     <div id="controls">
         Controls:<br>
         W/↑ - Accelerate<br>
